@@ -1,0 +1,1 @@
+tamarin-prover --prove   impersonation_pop.spthy --auto-sources --derivcheck-timeout=0

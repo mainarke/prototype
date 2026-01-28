@@ -1,0 +1,107 @@
+theory SSST_noPoP
+begin
+
+functions:
+  pk/1, // derives a public key given 1 argument
+  sign/2, // signs a message using 2 arguments
+  verify/2[destructor], // checks a signature and recovers the message
+  nopop/0 // placeholder for no PoP
+
+equations:
+  // verify(sign(m,sk), pk(sk)) gives back m
+  verify(sign(m,sk), pk(sk)) = m
+
+
+let Client(u, skRoot) =
+  new sid;
+  new rid;
+
+  // payload includes user label, session id, and revocation id.
+  let payload = <u, sid, rid> in
+  let tok = sign(payload, skRoot) in
+
+  event Issued(u, rid, tok);
+
+  new m;
+  new ts;
+  new nonce;
+
+  event SentReq(u, tok, m, ts, nonce, nopop);
+  out(< 'req', u, tok, m, ts, nonce, nopop >);
+
+  // Client-side revocation, marking rid as revoked in its local store.
+  // Sends revocation notice to server.
+  (
+    insert <'revC', u, rid>, '1';
+    event RevokeClient(u, rid);
+    out(< 'revoke', u, rid >);
+    0
+  ) + 0
+
+
+let Server(pkRoot) =
+  new srv;
+  !(
+    in(msg);
+    (
+      ( // revoke
+        let <'revoke', u, rid> = msg in
+        insert <'revS', srv, u, rid>, '1';
+        event ServerLearnsRevoke(srv, u, rid);
+        0
+      )
+      +
+      ( // request
+        let <'req', u, tok, m, ts, nonce, pop> = msg in
+        event RecvReq(u, tok, m, ts, nonce, pop);
+
+        // verify SSST token under pkRoot, extract rid from signed payload
+        let payload = verify(tok, pkRoot) in
+        let < =u, sid, rid > = payload in
+
+        // seen-nonce cache, reject if already present
+        lookup <'seen', srv, u, rid, nonce> as sn in
+          0
+        else
+          (
+            // check revocation cache
+            lookup <'revS', srv, u, rid> as st in
+              if st = '1' then 0
+              else
+                (
+                  insert <'seen', srv, u, rid, nonce>, '1';
+                  event Accept(srv, u, rid, tok, m, ts, nonce, pop);
+                  out('ok')
+                )
+            else
+              (
+                insert <'seen', srv, u, rid, nonce>, '1';
+                event Accept(srv, u, rid, tok, m, ts, nonce, pop);
+                out('ok')
+              )
+          )
+      )
+    )
+  )
+
+
+process:
+  new sk;
+  (!Server(pk(sk)) | Client('Alice', sk))
+
+
+// The server received a particular request and then accepted that same request.
+// If the server accepts a request that claims to be from Alice, then Alice must really have created that exact request earlier.
+lemma no_impersonation:
+  "All srv rid tok m ts nonce popSig #j #k.
+     ( Accept(srv,'Alice',rid,tok,m,ts,nonce,popSig)@#j
+     & RecvReq('Alice',tok,m,ts,nonce,popSig)@#k
+     & #k < #j )
+     ==> (Ex #i1 #i2.
+           Issued('Alice',rid,tok)@#i1
+         & SentReq('Alice',tok,m,ts,nonce,popSig)@#i2
+         & #i1 < #i2
+         & #i2 < #k)"
+
+
+end
