@@ -1,0 +1,33 @@
+lemma no_hijacking:
+  all-traces
+  "∀ srv rid tok m ts nonce popSig #j #k.
+         (((Accept( srv, 'Alice', rid, tok, m, ts, nonce, popSig
+            ) @ #j) ∧
+           (RecvReq( 'Alice', tok, m, ts, nonce, popSig ) @ #k)) ∧
+          (#k < #j)) ⇒
+         (∃ #i1 #i2.
+           (((Issued( 'Alice', rid, tok ) @ #i1) ∧
+             (SentReq( 'Alice', tok, m, ts, nonce, popSig ) @ #i2)) ∧
+            (#i1 < #i2)) ∧
+           (#i2 < #k))"
+simplify
+solve( State_111111121( m, msg, nonce, popSig, sk, srv, tok, ts,
+                        'Alice'
+       ) ▶₀ #k )
+  case letrequtokmtsnoncepopmsg_1_11111112
+  solve( Accept( srv, 'Alice', rid, tok, m, ts, nonce, popSig
+         ) @ #j )
+    case eventAcceptsrvuridtokmtsnoncepop_0_111111121111221
+    solve( State_111111121111221( m, msg, nonce, payload, popSig, sid,
+                                  sk, srv, tok, ts, rid, 'Alice'
+           ) ▶₀ #j )
+      case insertseensrvuridnonce_0_11111112111122
+      solve( !KU( sign(<'Alice', sid, rid>, ~n) ) @ #vk.5 )
+        case eventSentReqAlicesignAlicesidridskmtsnoncenopop_0_11211111111
+        SOLVED // trace found
+      qed
+    qed
+  qed
+qed
+
+end

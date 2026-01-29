@@ -104,7 +104,7 @@ process:
 
 // The server received a particular request and then accepted that same request.
 // If the server accepts a request that claims to be from Alice, then Alice must really have created that exact request earlier.
-lemma no_impersonation:
+lemma no_hijacking:
   "All srv rid tok m ts nonce popSig #j #k.
      ( Accept(srv,'Alice',rid,tok,m,ts,nonce,popSig)@#j
      & RecvReq('Alice',tok,m,ts,nonce,popSig)@#k
