@@ -1,1 +1,1 @@
-tamarin-prover --prove   impersonation_nopop.spthy --auto-sources --derivcheck-timeout=0
+tamarin-prover --prove   hijacking_nopop.spthy --auto-sources --derivcheck-timeout=0
